@@ -58,3 +58,5 @@ numbers a prospect can reproduce in a proof of concept.
 
 The competitor tables reflect public vendor documentation (October 2026). Re-check
 them before major campaigns; comparative claims must stay accurate.
+
+
