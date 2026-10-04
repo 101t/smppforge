@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://smppforge.com/sitemap.xml
