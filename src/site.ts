@@ -5,4 +5,5 @@ export const SITE = {
   url: 'https://smppforge.com',
   salesEmail: 'sales@smppforge.com',
   infoEmail: 'info@smppforge.com',
+  country: 'Turkey',
 } as const;

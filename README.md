@@ -39,7 +39,7 @@ Variables). The form POSTs JSON to it.
 
 | What | Where |
 |------|-------|
-| Brand name, emails, domain | `src/site.ts` |
+| Brand name, emails, domain, country | `src/site.ts` |
 | Landing page, comparison tables | `src/pages/Home.tsx` |
 | Slide decks (`/slides/overview`, `/slides/sales`) | `src/pages/Slides.tsx` |
 | Privacy policy / terms | `src/pages/Privacy.tsx`, `src/pages/Terms.tsx` — have counsel review |
@@ -57,6 +57,11 @@ numbers a prospect can reproduce in a proof of concept.
 ### Comparison claims
 
 The competitor tables reflect public vendor documentation (October 2026). Re-check
-them before major campaigns; comparative claims must stay accurate.
+them before major campaigns; comparative claims must stay accurate. The sender-ID rules
+table (`senderRules` in `src/pages/Home.tsx`) summarises regulator guidance as of
+September 2026 — re-check it the same way.
+
+Site copy draws on the product docs but must not name internal technologies
+(language, frameworks, databases, queues); describe behaviour, not implementation.
 
 

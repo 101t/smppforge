@@ -175,7 +175,7 @@ const overview: Slide[] = [
     title: 'Security',
     content: (
       <Cards items={[
-        ['Authentication', 'API credentials, signed console sessions, TOTP two-factor sign-in, Argon2id password hashing'],
+        ['Authentication', 'API credentials, signed console sessions, TOTP two-factor sign-in, strong password hashing'],
         ['Network', 'Per-IP throttling, CIDR allow / deny lists, trusted-proxy handling, TLS on SMPP'],
         ['Data protection', 'Parameterised queries, input validation at every boundary, secrets and phone numbers masked in logs'],
         ['Accountability', 'Full audit trail of administrative actions, role-based access (admin / user)'],
@@ -213,7 +213,7 @@ const overview: Slide[] = [
     title: 'Deployment & operations',
     content: (
       <Cards items={[
-        ['Amazon Web Services', 'EC2 or ECS with Amazon RDS and ElastiCache. AWS Marketplace listing coming soon.'],
+        ['Amazon Web Services', 'EC2 or ECS in your own account and region. AWS Marketplace listing coming soon.'],
         ['On-premise', 'Container image for any Linux host, including air-gapped operator networks'],
         ['Safe testing', 'Built-in SMSC simulator: exercise routes and billing without touching carriers'],
         ['Observability', 'Health endpoints, Prometheus metrics, analytics dashboards, scheduled reports'],

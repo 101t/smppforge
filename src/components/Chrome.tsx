@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { Mail, MapPin } from 'lucide-react';
 import { SITE } from '../site';
 import { PUBLISHED } from '../benchmark';
 
@@ -15,6 +15,7 @@ export function Brand({ size = 'w-8 h-8', dark = false }: { size?: string; dark?
 const sections = [
   { href: '/#platform', label: 'Platform' },
   ...(PUBLISHED ? [{ href: '/#benchmarks', label: 'Performance' }] : []),
+  { href: '/#compliance', label: 'Compliance' },
   { href: '/#comparison', label: 'Compare' },
   { href: '/#migration', label: 'Migrate from Jasmin' },
   { href: '/#deployment', label: 'Deployment' },
@@ -71,6 +72,7 @@ export function SiteFooter() {
               <li><a href={`mailto:${SITE.salesEmail}`} className="inline-flex items-center gap-1.5 hover:text-white"><Mail className="w-3.5 h-3.5" />{SITE.salesEmail}</a></li>
               <li><a href={`mailto:${SITE.infoEmail}`} className="inline-flex items-center gap-1.5 hover:text-white"><Mail className="w-3.5 h-3.5" />{SITE.infoEmail}</a></li>
               <li><Link to="/contact" className="hover:text-white">Request a demo</Link></li>
+              <li className="inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" />Proudly built in {SITE.country}</li>
             </ul>
           </div>
         </div>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight, CheckCircle2, Send, Building2, Mail, Phone, User, Globe,
-  MessageSquare, Shield, AlertCircle, Sparkles,
+  MessageSquare, Shield, AlertCircle, Sparkles, MapPin,
 } from 'lucide-react';
 import { SiteNav, SiteFooter } from '../components/Chrome';
 import { SITE } from '../site';
@@ -111,6 +111,13 @@ export default function Contact() {
               <div className="font-semibold text-gray-900">General enquiries</div><div className="text-indigo-600">{SITE.infoEmail}</div>
             </a>
           </div>
+          <address className="not-italic flex items-start gap-3 bg-white rounded-xl border border-gray-100 p-4 text-sm">
+            <MapPin className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold text-gray-900">Proudly built in {SITE.country}</div>
+              <div className="text-gray-600">Designed and engineered in {SITE.country} for messaging businesses worldwide.</div>
+            </div>
+          </address>
           <div className="flex items-center gap-3 text-sm text-gray-500">
             <Shield className="w-5 h-5 text-gray-400" />
             <span>No obligation · Guided proof of concept · Reply within one business day</span>

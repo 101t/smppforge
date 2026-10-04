@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Zap, Shield, Globe, BarChart3, ArrowRight, CheckCircle2, Clock, Radio, GitBranch,
   Phone, CreditCard, Lock, Gauge, Code2, Eye, Cpu, MemoryStick, Building2, Satellite,
-  Webhook, Scale, Server, Cloud, Terminal, ArrowLeftRight, Users, Minus,
+  Webhook, Scale, Server, Cloud, Terminal, ArrowLeftRight, Users, Minus, MapPin, Fingerprint,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
@@ -50,6 +50,60 @@ const useCases = [
   { icon: Lock, title: 'Regulated industries', desc: 'Keep message data in your region with an audit trail, encryption in transit and role-based access for every action.' },
 ];
 
+/** Headline counts from the product documentation. */
+const platformNumbers = [
+  { value: '27', label: 'SMPP PDU types', sub: 'Including submit_multi, replace_sm, cancel_sm and outbind' },
+  { value: '4', label: 'Routing strategies', sub: 'Static, weighted round-robin, failover, least-cost' },
+  { value: '10', label: 'Route filter types', sub: 'User, group, connector, source, destination, content, tag, date, time, catch-all' },
+  { value: '5', label: 'HLR provider adapters', sub: 'Including a generic adapter for any local operator API' },
+  { value: '100,000', label: 'Messages per bulk batch', sub: 'Paced to account throughput, with live progress' },
+  { value: '4', label: 'Webhook event types', sub: 'Sent, failed, delivery receipt, inbound message' },
+];
+
+/* ───────────────────────── Engineering in numbers ───────────────────────── */
+
+const GSM = '#6366f1';
+const UCS = '#ec4899';
+// Characters that fit in n SMS parts: one part holds 160 GSM-7 / 70 UCS-2; a long message loses
+// 7 / 3 characters per part to the concatenation header (3GPP TS 23.040).
+const segments = [1, 2, 3, 4, 5].map(n => ({
+  name: n === 1 ? '1 part' : `${n} parts`,
+  gsm: n === 1 ? 160 : 153 * n,
+  ucs2: n === 1 ? 70 : 67 * n,
+}));
+
+// Webhook delivery back-off: doubles from 1 s, capped at 60 s.
+const retryDelays = [1, 2, 3, 4, 5, 6, 7].map(n => ({ name: `Retry ${n}`, value: Math.min(2 ** (n - 1), 60) }));
+
+const resilience = [
+  { value: '3 → 30 s', label: 'Circuit breaker', sub: 'Three failed submits in a row take a connector out for 30 seconds, then one probe tests it' },
+  { value: '300 ms', label: 'Lookup budget', sub: 'Default limit on a number-portability lookup; a slow provider never holds a message' },
+  { value: '4', label: 'Receipt callback attempts', sub: 'Each delivery-receipt callback to your URL is retried with back-off' },
+  { value: '0', label: 'Blind resubmits', sub: 'A message is never resubmitted after an ambiguous timeout, so nothing is delivered twice' },
+];
+
+/* ───────────────────────── Sender-ID compliance ───────────────────────── */
+
+type Regime = 'required' | 'brand' | 'numeric';
+const regimes: Record<Regime, { label: string; cls: string }> = {
+  required: { label: 'Registration required', cls: 'bg-indigo-100 text-indigo-800' },
+  brand: { label: 'Brand-protection registry', cls: 'bg-violet-100 text-violet-800' },
+  numeric: { label: 'Numeric senders only', cls: 'bg-gray-100 text-gray-700' },
+};
+
+// Public regulator and industry guidance, September 2026.
+const senderRules: { market: string; authority: string; regime: Regime; rule: string }[] = [
+  { market: 'Turkey', authority: 'BTK · İYS · KVKK', regime: 'required', rule: '3–11 characters matching a trade name or brand; commercial SMS needs İYS consent; SMS from abroad containing links blocked since 2026' },
+  { market: 'United Kingdom', authority: 'MEF SenderID Protection Registry', regime: 'brand', rule: 'Registered brands — and thousands of look-alike variants — are blocked for everyone else' },
+  { market: 'Spain', authority: 'CNMC alias registry', regime: 'required', rule: 'Every alphanumeric alias sent to Spanish numbers must be pre-registered' },
+  { market: 'Singapore', authority: 'SGNIC SSIR (IMDA)', regime: 'required', rule: 'Unregistered senders are shown as “Likely-SCAM” since 31 January 2023' },
+  { market: 'Australia', authority: 'ACMA Sender ID Register', regime: 'required', rule: 'All alphanumeric sender IDs, new and existing, must be registered from 1 July 2026' },
+  { market: 'India', authority: 'TRAI DLT', regime: 'required', rule: 'Entity, 6-character header and message template must all be registered' },
+  { market: 'United States', authority: 'CTIA · The Campaign Registry', regime: 'numeric', rule: 'A2P traffic uses registered 10DLC, verified toll-free numbers or short codes' },
+  { market: 'Canada', authority: 'CWTA · CRTC · CASL', regime: 'numeric', rule: 'Short codes vetted by CWTA; consent required for commercial messages' },
+];
+const regimeCount = (r: Regime) => senderRules.filter(x => x.regime === r).length;
+
 /* ───────────────────────── Comparison ───────────────────────── */
 
 type Cell = { v: string; ok?: boolean | null };
@@ -71,6 +125,17 @@ const openSource: { feature: string; forge: Cell; jasmin: Cell; kannel: Cell }[]
   { feature: 'Two-factor sign-in & audit trail', forge: yes('TOTP 2FA + full audit log'), jasmin: no('No'), kannel: no('No') },
   { feature: 'Prometheus metrics', forge: yes('Yes'), jasmin: yes('Yes'), kannel: part('XML status page') },
   { feature: 'Jasmin HTTP API & jcli compatibility', forge: yes('Yes'), jasmin: yes('Native'), kannel: no('No') },
+];
+
+const tally = (k: 'forge' | 'jasmin' | 'kannel') => ({
+  built: openSource.filter(r => r[k].ok === true).length,
+  partial: openSource.filter(r => r[k].ok === null).length,
+  none: openSource.filter(r => r[k].ok === false).length,
+});
+const coverage = [
+  { name: SITE.name, ...tally('forge') },
+  { name: 'Jasmin', ...tally('jasmin') },
+  { name: 'Kannel', ...tally('kannel') },
 ];
 
 const landscape = [
@@ -131,12 +196,19 @@ const heroStats = PUBLISHED ? [
   { label: 'Jasmin-compatible API & CLI', value: 'Drop-in', icon: ArrowLeftRight },
 ];
 
-function BenchTooltip({ active, payload, label, unit }: { active?: boolean; payload?: { value: number }[]; label?: string; unit: string }) {
+function ChartTooltip({ active, payload, label, unit }: { active?: boolean; payload?: { name?: string; value: number; color?: string }[]; label?: string; unit: string }) {
   if (!active || !payload?.length) return null;
+  const many = payload.length > 1;
   return (
-    <div className="bg-white rounded-xl shadow-xl border border-gray-100 px-4 py-3 text-xs">
-      <p className="font-semibold text-gray-800 mb-1">{label}</p>
-      <p><span className="font-bold text-gray-900">{payload[0].value.toLocaleString()}</span> <span className="text-gray-500">{unit}</span></p>
+    <div className="bg-white rounded-xl shadow-xl border border-gray-100 px-4 py-3 text-xs space-y-1">
+      <p className="font-semibold text-gray-800">{label}</p>
+      {payload.map(p => (
+        <p key={p.name} className="flex items-center gap-1.5">
+          {many && <span className="w-2 h-2 rounded-sm" style={{ background: p.color }} />}
+          <span className="font-bold text-gray-900">{p.value.toLocaleString()}</span>
+          <span className="text-gray-500">{unit}{many && ` · ${p.name}`}</span>
+        </p>
+      ))}
     </div>
   );
 }
@@ -146,7 +218,7 @@ function CellView({ cell, strong = false }: { cell: Cell; strong?: boolean }) {
     ? <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
     : cell.ok === false
       ? <Minus className="w-4 h-4 text-gray-300 flex-shrink-0" />
-      : <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center"><span className="w-2 h-2 rounded-full bg-amber-400" /></span>;
+      : <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center"><span className="w-2 h-2 rounded-full bg-amber-500" /></span>;
   return (
     <div className={`flex items-start gap-2 ${strong ? 'font-semibold text-indigo-800' : cell.ok === false ? 'text-gray-400' : 'text-gray-600'}`}>
       {icon}<span>{cell.v}</span>
@@ -232,6 +304,10 @@ export default function Home() {
               </div>
             ))}
           </div>
+          <h3 className="mt-16 mb-6 text-xl font-bold text-gray-900 text-center">The platform in numbers</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            {platformNumbers.map(n => <StatTile key={n.label} {...n} />)}
+          </div>
         </div>
       </section>
 
@@ -264,8 +340,8 @@ export default function Home() {
                   <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false}
                     label={{ value: bench.x, position: 'insideBottom', offset: -10, fontSize: 11, fill: '#94a3b8' }} />
                   <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={v => (v >= 1000 ? `${v / 1000}K` : String(v))} />
-                  <Tooltip cursor={{ fill: '#eef2ff' }} content={<BenchTooltip unit={bench.unit} />} />
-                  <Bar dataKey="value" fill={PRO} radius={[6, 6, 0, 0]} maxBarSize={56}>
+                  <Tooltip cursor={{ fill: '#eef2ff' }} content={<ChartTooltip unit={bench.unit} />} />
+                  <Bar isAnimationActive={false} dataKey="value" fill={PRO} radius={[6, 6, 0, 0]} maxBarSize={56}>
                     <LabelList dataKey="value" position="top" fontSize={11} fill="#475569"
                       formatter={(v: unknown) => (typeof v === 'number' && v >= 1000 ? `${(v / 1000).toFixed(1)}K` : String(v))} />
                   </Bar>
@@ -380,6 +456,125 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ═════════════ ENGINEERING IN NUMBERS ═════════════ */}
+      <section id="engineering" className="py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionHead eyebrow="Engineering in numbers" title="Bill every part exactly. Fail safely.">
+            How the gateway counts message parts, and how it behaves when a carrier, a lookup provider or a customer endpoint misbehaves.
+          </SectionHead>
+          <div className="grid lg:grid-cols-2 gap-8">
+            <ChartCard title="Characters per message, by encoding"
+              desc="Plain text goes out as GSM-7; one accented letter, Arabic or Cyrillic character, or emoji switches the whole message to UCS-2 — and cuts its capacity by more than half.">
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={segments} barGap={2} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis fontSize={11} tickLine={false} axisLine={false} />
+                  <Tooltip cursor={{ fill: '#eef2ff' }} content={<ChartTooltip unit="characters" />} />
+                  <Bar isAnimationActive={false} dataKey="gsm" name="GSM-7" fill={GSM} radius={[4, 4, 0, 0]} maxBarSize={24} />
+                  <Bar isAnimationActive={false} dataKey="ucs2" name="UCS-2" fill={UCS} radius={[4, 4, 0, 0]} maxBarSize={24} />
+                </BarChart>
+              </ResponsiveContainer>
+              <Swatches items={[['GSM-7 · plain Latin text', GSM], ['UCS-2 · accents, Arabic, Cyrillic, emoji', UCS]]} />
+              <table className="mt-5 w-full text-sm">
+                <thead><tr className="text-left text-xs text-gray-500 border-b border-gray-100">
+                  <th className="py-2 font-medium">Encoding</th><th className="py-2 font-medium">Single SMS</th><th className="py-2 font-medium">Each part of a long SMS</th>
+                </tr></thead>
+                <tbody className="text-gray-700 tabular-nums">
+                  <tr className="border-b border-gray-50"><td className="py-2">GSM-7</td><td>160 characters</td><td>153 characters</td></tr>
+                  <tr><td className="py-2">UCS-2</td><td>70 characters</td><td>67 characters</td></tr>
+                </tbody>
+              </table>
+              <p className="mt-4 text-xs text-gray-500">Extension characters <code>^ {'{ }'} [ ] ~ | \</code> take two GSM-7 slots. {SITE.name} counts the parts exactly as they go on the wire and bills exactly those.</p>
+            </ChartCard>
+
+            <ChartCard title="Webhook retry back-off (seconds before each retry)"
+              desc="A failed webhook delivery is retried after 1 s, 2 s, 4 s and so on, doubling up to a 60-second cap. Every attempt is signed and logged; ten failures in a row pause the endpoint.">
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={retryDelays} margin={{ top: 24, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v: string) => v.replace('Retry ', '#')} />
+                  <YAxis fontSize={11} tickLine={false} axisLine={false} unit=" s" />
+                  <Tooltip cursor={{ fill: '#eef2ff' }} content={<ChartTooltip unit="s wait" />} />
+                  <Bar isAnimationActive={false} dataKey="value" fill={PRO} radius={[4, 4, 0, 0]} maxBarSize={24}>
+                    <LabelList dataKey="value" position="top" fontSize={11} fill="#475569" formatter={(v: unknown) => (v === 60 ? 'cap' : '')} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                {resilience.map(r => <StatTile key={r.label} {...r} />)}
+              </div>
+            </ChartCard>
+          </div>
+        </div>
+      </section>
+
+      {/* ═════════════ SENDER-ID COMPLIANCE ═════════════ */}
+      <section id="compliance" className="py-24 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionHead eyebrow="Sender-ID compliance" title="Every market has its own sender rules">
+            A sender name is the easiest way to impersonate a brand, and regulators are closing the gap. {SITE.name} checks format, brand ownership and destination country on every message.
+          </SectionHead>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+            <StatTile value={String(senderRules.length)} label="Markets profiled" sub="Rules researched from regulators and major aggregators" />
+            <StatTile value={`${regimeCount('required')} of ${senderRules.length}`} label="Require pre-registration" sub="Unregistered names are blocked or flagged as scams" />
+            <StatTile value={String(regimeCount('numeric'))} label="Numeric senders only" sub="Alphanumeric names are not supported at all" />
+            <StatTile value="11" label="Characters, maximum" sub="The GSM limit for a sender name (3GPP TS 23.040)" />
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+            <table className="w-full min-w-[820px] text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50 text-left text-gray-700">
+                  <th className="p-4 font-semibold">Market</th>
+                  <th className="p-4 font-semibold">Authority</th>
+                  <th className="p-4 font-semibold">Regime</th>
+                  <th className="p-4 font-semibold">What it means for senders</th>
+                </tr>
+              </thead>
+              <tbody>
+                {senderRules.map(r => (
+                  <tr key={r.market} className="border-b border-gray-50 align-top">
+                    <td className="p-4 font-semibold text-gray-900">{r.market}</td>
+                    <td className="p-4 text-gray-600">{r.authority}</td>
+                    <td className="p-4"><span className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${regimes[r.regime].cls}`}>{regimes[r.regime].label}</span></td>
+                    <td className="p-4 text-gray-600">{r.rule}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-8 grid md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7">
+              <Fingerprint className="w-7 h-7 text-indigo-600 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Look-alikes resolve to the original</h3>
+              <p className="text-sm text-gray-600 mb-5">Case, separators and common digit swaps are folded before matching, so a registered name cannot be spoofed with a near-copy — and the registered spelling is what goes out.</p>
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                {['acme bank', 'ACM3 BANK', 'Acme-Bank', 'ACME.Bank'].map(v => <code key={v} className="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700">{v}</code>)}
+                <ArrowRight className="w-4 h-4 text-indigo-400" />
+                <code className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-semibold">ACME Bank</code>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-7">
+              <MapPin className="w-7 h-7 text-indigo-600 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Built in {SITE.country}, ready for strict regimes</h3>
+              <ul className="space-y-2 text-sm text-gray-600">
+                {[
+                  'Sender names locked to their verified owner and to the destination countries they are approved for',
+                  'Consent and opt-in rules per region for commercial traffic, with quiet hours',
+                  'Phone numbers masked in logs and message bodies never logged — aligned with KVKK and GDPR',
+                  'Numeric-only destinations such as the US enforced before a message reaches a carrier',
+                ].map(t => <li key={t} className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />{t}</li>)}
+              </ul>
+            </div>
+          </div>
+          <p className="mt-4 text-xs text-gray-500 max-w-4xl">
+            Summary of public regulator and industry guidance as of September 2026. Rules change — confirm current requirements with your operator before approving senders.
+          </p>
+        </div>
+      </section>
+
       {/* ═════════════ USE CASES + ROADMAP ═════════════ */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-14">
@@ -419,6 +614,27 @@ export default function Home() {
             Side by side with the two most deployed open-source gateways, and positioned against the wider market.
           </SectionHead>
 
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
+            <h3 className="text-lg font-bold text-gray-900">{openSource.length} capabilities at a glance</h3>
+            <p className="text-sm text-gray-500 mb-4">How many rows of the table below each gateway covers fully, partially or not at all.</p>
+            <ResponsiveContainer width="100%" height={140}>
+              <BarChart layout="vertical" data={coverage} barSize={22} margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="#f1f5f9" horizontal={false} />
+                <XAxis type="number" domain={[0, openSource.length]} ticks={[0, 5, 10]} fontSize={11} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" width={96} fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip cursor={{ fill: '#eef2ff' }} content={<ChartTooltip unit="capabilities" />} />
+                <Bar isAnimationActive={false} dataKey="built" name="Built in" stackId="s" fill="#10b981" stroke="#fff" strokeWidth={2} />
+                <Bar isAnimationActive={false} dataKey="partial" name="Partial" stackId="s" fill="#f59e0b" stroke="#fff" strokeWidth={2} />
+                <Bar isAnimationActive={false} dataKey="none" name="Not available" stackId="s" fill="#d1d5db" stroke="#fff" strokeWidth={2} />
+              </BarChart>
+            </ResponsiveContainer>
+          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Built in</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500" /> Partial, add-on or external</span>
+            <span className="inline-flex items-center gap-1.5"><Minus className="w-3.5 h-3.5 text-gray-300" /> Not available</span>
+          </div>
+          </div>
+
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
@@ -440,11 +656,6 @@ export default function Home() {
                 ))}
               </tbody>
             </table>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-500">
-            <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Built in</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400" /> Partial, add-on or external</span>
-            <span className="inline-flex items-center gap-1.5"><Minus className="w-3.5 h-3.5 text-gray-300" /> Not available</span>
           </div>
 
           <h3 className="mt-16 mb-6 text-xl font-bold text-gray-900 text-center">The wider market</h3>
@@ -534,7 +745,7 @@ export default function Home() {
           </SectionHead>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { icon: Cloud, title: 'Amazon Web Services', body: 'Run on Amazon EC2 or ECS with managed database and cache services (Amazon RDS, Amazon ElastiCache). AWS Marketplace listing coming soon.' },
+              { icon: Cloud, title: 'Amazon Web Services', body: 'Run on Amazon EC2 or Amazon ECS in your own account and region. AWS Marketplace listing coming soon.' },
               { icon: Server, title: 'On-premise & private cloud', body: 'Ships as a container image for any Linux host or orchestrator, including air-gapped networks inside an operator core.' },
               { icon: BarChart3, title: 'Operate with confidence', body: 'Health endpoints, Prometheus metrics, audit trail and a built-in SMSC simulator for safe testing before go-live.' },
             ].map(({ icon: I, title, body }) => (
@@ -593,6 +804,36 @@ export default function Home() {
       </section>
 
       <SiteFooter />
+    </div>
+  );
+}
+
+function StatTile({ value, label, sub }: { value: string; label: string; sub: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5">
+      <div className="text-2xl sm:text-3xl font-bold text-gray-900">{value}</div>
+      <div className="mt-1 text-sm font-semibold text-gray-700">{label}</div>
+      <div className="mt-1 text-xs text-gray-500 leading-relaxed">{sub}</div>
+    </div>
+  );
+}
+
+function ChartCard({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+      <p className="text-sm text-gray-500 mb-6">{desc}</p>
+      {children}
+    </div>
+  );
+}
+
+function Swatches({ items }: { items: [string, string][] }) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-600">
+      {items.map(([label, color]) => (
+        <span key={label} className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: color }} />{label}</span>
+      ))}
     </div>
   );
 }
