@@ -63,5 +63,3 @@ September 2026 — re-check it the same way.
 
 Site copy draws on the product docs but must not name internal technologies
 (language, frameworks, databases, queues); describe behaviour, not implementation.
-
-
