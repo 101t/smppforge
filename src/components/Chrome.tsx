@@ -16,6 +16,7 @@ const sections = [
   { href: '/#platform', label: 'Platform' },
   ...(PUBLISHED ? [{ href: '/#benchmarks', label: 'Performance' }] : []),
   { href: '/#compliance', label: 'Compliance' },
+  { href: '/#settlement', label: 'Settlement' },
   { href: '/#comparison', label: 'Compare' },
   { href: '/#migration', label: 'Migrate from Jasmin' },
   { href: '/#deployment', label: 'Deployment' },

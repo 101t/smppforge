@@ -15,13 +15,13 @@ import { SITE } from '../site';
 /* ───────────────────────── Platform ───────────────────────── */
 
 const features = [
-  { icon: Radio, title: 'SMPP 3.3 / 3.4 / 5.0', description: 'Client and server roles with TLS and mutual TLS, automatic re-binding, and delivery receipts tracked end to end.' },
+  { icon: Radio, title: 'SMPP 3.3 / 3.4 / 5.0', description: 'Client and server roles with TLS and mutual TLS, automatic re-binding, and delivery receipts tracked end to end — even when a carrier changes the message-ID format.' },
   { icon: GitBranch, title: 'Intelligent routing', description: 'Static, weighted round-robin, failover with circuit breakers, least-cost with quality weighting, and number-portability-aware routes.' },
-  { icon: CreditCard, title: 'Real-time billing', description: 'Prepaid and postpaid accounts, rate cards by country and network, credit reserved before submit and refunded on failure, PDF invoices.' },
+  { icon: CreditCard, title: 'Real-time billing', description: 'Prepaid and postpaid accounts, rate cards and refund rules by country and network, credit reserved before submit, PDF invoices.' },
   { icon: Scale, title: 'Regulatory controls', description: 'Sender-ID registry, consent and opt-in rules, quiet hours, content rules and number blacklists — enforced on every send path.' },
   { icon: Phone, title: 'HLR & number portability', description: 'Multi-provider HLR lookups with caching, country-specific providers, and a local ported-number database you can import.' },
   { icon: Code2, title: 'REST API & OpenAPI', description: 'JSON API with interactive documentation, bulk sends with live progress, and Jasmin-compatible HTTP endpoints.' },
-  { icon: Webhook, title: 'Webhooks & DLR callbacks', description: 'HMAC-signed events with retries and delivery history; every callback URL is checked against internal-network targets.' },
+  { icon: Webhook, title: 'Webhooks & DLR callbacks', description: 'HMAC-signed events, refunds included, with retries and delivery history; every callback URL is checked against internal-network targets.' },
   { icon: Eye, title: 'Operator console', description: '30+ screens for users, groups, connectors, routes, filters, interceptors, billing, analytics, reports and audit.' },
   { icon: Shield, title: 'Security & observability', description: 'TOTP two-factor sign-in, role-based access, IP allow/deny lists, API throttling, full audit trail and Prometheus metrics.' },
 ];
@@ -30,7 +30,7 @@ const roadmap = {
   available: [
     'Single-node gateway: SMPP + HTTP + console',
     'Advanced & MNP-aware routing',
-    'Prepaid / postpaid billing and invoicing',
+    'Prepaid / postpaid billing, refund rules and invoicing',
     'Regulatory engine & sender-ID registry',
     'Signed webhooks and DLR callbacks',
     'Analytics dashboards and scheduled reports',
@@ -57,7 +57,7 @@ const platformNumbers = [
   { value: '10', label: 'Route filter types', sub: 'User, group, connector, source, destination, content, tag, date, time, catch-all' },
   { value: '5', label: 'HLR provider adapters', sub: 'Including a generic adapter for any local operator API' },
   { value: '100,000', label: 'Messages per bulk batch', sub: 'Paced to account throughput, with live progress' },
-  { value: '4', label: 'Webhook event types', sub: 'Sent, failed, delivery receipt, inbound message' },
+  { value: '5', label: 'Webhook event types', sub: 'Sent, failed, delivery receipt, refund, inbound message' },
 ];
 
 /* ───────────────────────── Engineering in numbers ───────────────────────── */
@@ -80,6 +80,29 @@ const resilience = [
   { value: '300 ms', label: 'Lookup budget', sub: 'Default limit on a number-portability lookup; a slow provider never holds a message' },
   { value: '4', label: 'Receipt callback attempts', sub: 'Each delivery-receipt callback to your URL is retried with back-off' },
   { value: '0', label: 'Blind resubmits', sub: 'A message is never resubmitted after an ambiguous timeout, so nothing is delivered twice' },
+];
+
+/* ───────────────────────── Refunds & settlement ───────────────────────── */
+
+const outcomes: { outcome: string; receipt: string; byDefault: string; withRule: string }[] = [
+  { outcome: 'Delivered', receipt: 'DELIVRD', byDefault: 'Charged', withRule: '—' },
+  { outcome: 'Rejected by the carrier', receipt: 'REJECTD', byDefault: 'Charged', withRule: 'Refund 0–100%' },
+  { outcome: 'Undelivered', receipt: 'UNDELIV', byDefault: 'Charged', withRule: 'Refund 0–100%' },
+  { outcome: 'Expired, or no receipt in time', receipt: 'EXPIRED', byDefault: 'Charged', withRule: 'Refund 0–100%' },
+  { outcome: 'Never accepted by a carrier', receipt: '—', byDefault: 'Refunded at once', withRule: '—' },
+];
+
+const exampleRules: { card: string; dest: string; refunds: string[]; terms: string }[] = [
+  { card: 'Default', dest: 'All other destinations', refunds: ['Rejected', 'Expired'], terms: '100% · after 24 h' },
+  { card: 'Default', dest: '+1 United States & Canada', refunds: [], terms: 'No refund' },
+  { card: 'Customer · acme', dest: '+963 Syria', refunds: ['Rejected', 'Undelivered'], terms: '50% · immediately' },
+];
+
+const settlementFacts = [
+  { value: 'Once', label: 'Every refund, exactly', sub: 'Status, balance and ledger entry change together; repeated or late receipts can never pay twice' },
+  { value: '48 h', label: 'No endless “pending”', sub: 'A message with no receipt by the end of its validity period (48 hours by default) closes as expired' },
+  { value: '0–30 d', label: 'Hold window', sub: 'Delay refunds so a late delivery receipt can still cancel a no-receipt refund' },
+  { value: 'Hex ↔ dec', label: 'Receipts always match', sub: 'Per connector, even when a carrier quotes the message ID in another number base' },
 ];
 
 /* ───────────────────────── Sender-ID compliance ───────────────────────── */
@@ -120,6 +143,7 @@ const openSource: { feature: string; forge: Cell; jasmin: Cell; kannel: Cell }[]
   { feature: 'Failover / round-robin / least-cost routing', forge: yes('Yes, with circuit breakers'), jasmin: yes('Yes'), kannel: part('Prefix & SMSC rules') },
   { feature: 'HLR / number-portability routing', forge: yes('Built in + local MNP DB'), jasmin: part('HLR lookup routes'), kannel: no('No') },
   { feature: 'Customer billing, rate cards & invoices', forge: yes('Prepaid, postpaid, PDF invoices'), jasmin: part('Balance & quotas'), kannel: no('External') },
+  { feature: 'Refund rules for undelivered traffic', forge: yes('Per country, network & customer'), jasmin: no('No'), kannel: no('External') },
   { feature: 'Regulatory controls (sender ID, consent, quiet hours)', forge: yes('Built in'), jasmin: part('Via filters & interceptors'), kannel: no('External') },
   { feature: 'Signed webhooks & DLR callbacks', forge: yes('HMAC-signed, retried'), jasmin: part('DLR callbacks'), kannel: part('DLR URL callbacks') },
   { feature: 'Two-factor sign-in & audit trail', forge: yes('TOTP 2FA + full audit log'), jasmin: no('No'), kannel: no('No') },
@@ -422,10 +446,10 @@ export default function Home() {
                 {[
                   ['Compliance', 'Blacklist · consent · sender ID'],
                   ['HLR / MNP', 'Portability lookups'],
-                  ['Billing', 'Reserve · charge · refund'],
+                  ['Billing', 'Reserve · charge · settle'],
                   ['Routing', 'LCR · failover · RR'],
                   ['Long SMS', 'Split · UDH · encodings'],
-                  ['DLR', 'Receipts · webhooks'],
+                  ['DLR', 'Receipts · expiry · webhooks'],
                 ].map(([label, desc]) => (
                   <div key={label} className="bg-white/15 rounded-lg p-2.5 text-center">
                     <div className="text-xs font-bold">{label}</div>
@@ -506,6 +530,59 @@ export default function Home() {
               </div>
             </ChartCard>
           </div>
+        </div>
+      </section>
+
+      {/* ═════════════ REFUNDS & SETTLEMENT ═════════════ */}
+      <section id="settlement" className="py-24 bg-gradient-to-br from-indigo-50/60 via-white to-violet-50/60">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionHead eyebrow="Refunds & settlement" title="Settle undelivered traffic on your terms">
+            Carriers bill every message they accept, delivered or not. Decide per country, network and customer what happens to the charge when a message is rejected, undelivered or expires.
+          </SectionHead>
+          <div className="grid lg:grid-cols-2 gap-8 mb-8">
+            <ChartCard title="What happens to the charge"
+              desc="Messages are charged when a carrier accepts them, as is standard across the industry, unless a refund rule for the destination says otherwise.">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[460px] text-sm">
+                  <thead><tr className="text-left text-xs text-gray-500 border-b border-gray-100">
+                    <th className="py-2 font-medium">Outcome</th><th className="py-2 font-medium">Receipt</th><th className="py-2 font-medium">By default</th><th className="py-2 font-medium">With a refund rule</th>
+                  </tr></thead>
+                  <tbody className="text-gray-700">
+                    {outcomes.map(o => (
+                      <tr key={o.outcome} className="border-b border-gray-50 last:border-0">
+                        <td className="py-2.5 pr-3 font-medium text-gray-900">{o.outcome}</td>
+                        <td className="py-2.5 pr-3"><code className="text-xs">{o.receipt}</code></td>
+                        <td className="py-2.5 pr-3">{o.byDefault}</td>
+                        <td className="py-2.5">{o.withRule}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </ChartCard>
+            <ChartCard title="Example refund rules"
+              desc="Matched like your rate card: the longest country or network prefix wins, and a customer's own rules come before the default.">
+              <div className="space-y-3">
+                {exampleRules.map(r => (
+                  <div key={r.card + r.dest} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-gray-100 p-4">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.card === 'Default' ? 'bg-gray-100 text-gray-700' : 'bg-violet-100 text-violet-700'}`}>{r.card}</span>
+                    <span className="text-sm font-semibold text-gray-900">{r.dest}</span>
+                    <span className="flex flex-wrap items-center gap-1 sm:ml-auto">
+                      {r.refunds.map(o => <span key={o} className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">{o}</span>)}
+                    </span>
+                    <span className="text-xs text-gray-500">{r.terms}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-4 text-xs text-gray-500">A rule with no outcome selected excludes a destination from a broader rule, for example a market whose carrier bills rejected traffic.</p>
+            </ChartCard>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {settlementFacts.map(f => <StatTile key={f.label} {...f} />)}
+          </div>
+          <p className="mt-6 text-sm text-gray-600 text-center max-w-3xl mx-auto">
+            Customers see the refund terms that apply to them in their own console, every refund shows in their credit history and on your ledger, and your systems receive a signed <code>sms_refunded</code> webhook.
+          </p>
         </div>
       </section>
 

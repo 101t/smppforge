@@ -189,7 +189,7 @@ const overview: Slide[] = [
         <Cards items={[
           ['Prepaid & postpaid', 'Credits deducted per message, or send up to a credit limit and invoice'],
           ['Rate cards', 'Price by country and network prefix, per customer'],
-          ['Reserve, then charge', 'Credit is held before submit and refunded automatically on failure'],
+          ['Reserve, charge, settle', 'Credit is held before submit; refund rules per country and network settle rejected, undelivered or expired messages, exactly once'],
           ['Invoices', 'PDF invoices, CSV exports, self-service balance and history'],
         ]} />
       </div>
@@ -226,7 +226,7 @@ const overview: Slide[] = [
       <div className="grid sm:grid-cols-2 gap-8">
         <div>
           <h3 className="text-lg font-semibold text-emerald-600 mb-3">Available now</h3>
-          <Bullets items={['Advanced and MNP-aware routing', 'Billing, rate cards and invoicing', 'Regulatory engine', 'Signed webhooks', 'Analytics and reports']} />
+          <Bullets items={['Advanced and MNP-aware routing', 'Billing, rate cards, refund rules and invoicing', 'Regulatory engine', 'Signed webhooks', 'Analytics and reports']} />
         </div>
         <div>
           <h3 className="text-lg font-semibold text-amber-600 mb-3">Next</h3>
@@ -263,7 +263,7 @@ const sales: Slide[] = [
         <p className="text-2xl font-semibold text-gray-800">The SMS gateway for businesses that sell, route and account for messages.</p>
         <Cards items={[
           ['Carrier-grade protocol', 'SMPP 3.3 / 3.4 / 5.0 with TLS and mutual TLS'],
-          ['A revenue engine', 'Rate cards, prepaid and postpaid billing, invoices'],
+          ['A revenue engine', 'Rate cards, refund rules, prepaid and postpaid billing, invoices'],
           ['Compliance built in', 'Sender IDs, consent, quiet hours, content rules'],
           ['Your infrastructure', 'Self-hosted on AWS or on-premise; your data stays yours'],
         ]} />
@@ -276,6 +276,7 @@ const sales: Slide[] = [
       <Table highlight={2} head={['Capability', 'Typical open-source gateway', SITE.name]} rows={[
         ['Web operator console', 'Add-on or none', 'Built in, 30+ screens'],
         ['Customer billing & invoices', 'Basic balance or external', 'Prepaid, postpaid, PDF invoices'],
+        ['Refunds for undelivered traffic', 'No', 'Rules per country, network & customer'],
         ['Least-cost & failover routing', 'Partial', 'Built in, with circuit breakers'],
         ['Number portability routing', 'Rare', 'Built in, local MNP database'],
         ['Regulatory controls', 'Scripted by you', 'Built in, every send path'],
