@@ -26,7 +26,9 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          # Optional form backend (e.g. https://formspree.io/f/xxxx). Unset = mailto fallback.
+          # Demo-request delivery (see src/lib/leads.ts). Both optional; with neither set the form
+          # posts to FormSubmit, which mails sales@ once the inbox has activated the form.
+          VITE_WEB3FORMS_KEY: ${{ vars.WEB3FORMS_KEY }}
           VITE_FORM_ENDPOINT: ${{ vars.FORM_ENDPOINT }}
       - uses: actions/upload-pages-artifact@v3
         with:

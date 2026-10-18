@@ -1,13 +1,28 @@
 # smppforge.com
 
-Marketing site for SMPP Forge: landing page, demo request, slide decks, privacy and
-terms. Static React + Vite build, deployed to GitHub Pages on every push to `main`.
+Marketing site for SMPP Forge: product, solutions, security, comparison, migration, pricing
+and company pages, a demo-request form, two slide decks, privacy and terms. Static React + Vite
+build, prerendered to HTML per route, deployed to GitHub Pages on every push to `main`.
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run build      # type-check + build to dist/ (with per-route index.html files)
+npm run build      # type-check, client build, SSR build, prerender every route + sitemap into dist/
 ```
+
+## How the build works
+
+`npm run build` runs `scripts/prerender.mjs` after the Vite builds. For each route in `ROUTES`
+(`src/seo.ts`) it writes `dist/<route>.html` with the page already rendered and its own
+`<title>`, description, canonical, Open Graph / Twitter tags and JSON-LD (Organization,
+WebSite, SoftwareApplication, FAQPage, BreadcrumbList). It also writes `dist/404.html`
+(`noindex`) and `dist/sitemap.xml`. The browser then hydrates the page.
+
+GitHub Pages serves `/platform` from `platform.html` with a 200, and serves `404.html` (status
+404) for anything else; the app then renders whichever route matches, so `/contact/` still works.
+
+Adding a page: create it in `src/pages/`, add a `<Route>` in `src/App.tsx` and its metadata to
+`ROUTES` in `src/seo.ts`. The prerender and sitemap pick it up automatically.
 
 ## One-time GitHub Pages setup
 
@@ -27,39 +42,61 @@ npm run build      # type-check + build to dist/ (with per-route index.html file
    Keep your existing MX records for `sales@` / `info@` untouched.
 5. Recommended: verify the domain under your GitHub account (Settings → Pages →
    Verified domains) so nobody else can claim it.
+6. After the first deploy, submit `https://smppforge.com/sitemap.xml` in Google Search
+   Console and Bing Webmaster Tools.
 
 ## Demo-request form
 
-Without configuration the form opens a pre-filled email to `sales@smppforge.com`.
-To receive submissions directly, create a form endpoint (e.g. Formspree) and set the
-repository variable `FORM_ENDPOINT` (Settings → Secrets and variables → Actions →
-Variables). The form POSTs JSON to it.
+The form posts JSON from the browser — no server of our own. Provider order (`src/lib/leads.ts`):
+
+| Repository variable (Settings → Secrets and variables → Actions → **Variables**) | Provider | Free tier |
+|---|---|---|
+| `WEB3FORMS_KEY` | [Web3Forms](https://web3forms.com) — enter `sales@smppforge.com` there to get a key | 250 submissions / month |
+| `FORM_ENDPOINT` | Any JSON form endpoint (Formspree, Getform, Basin…) | Varies |
+| *(neither set — default)* | [FormSubmit](https://formsubmit.co) AJAX → `sales@smppforge.com` | Free, no account |
+
+**Default (FormSubmit) needs one activation:** after deploying, submit the form once on
+`https://smppforge.com/contact`. FormSubmit emails an **Activate Form** link to
+`sales@smppforge.com`; click it, and every later request arrives in that inbox as a table
+(the visitor's email is set as reply-to). Until activation, visitors see a fallback with a
+pre-filled email and a copy-details button, so no lead is lost.
+
+Either key is public by design (it only allows sending to your inbox), so a repository
+*variable* is fine. A hidden honeypot field silently drops bot submissions.
 
 ## Content
 
 | What | Where |
 |------|-------|
-| Brand name, emails, domain, country | `src/site.ts` |
-| Landing page, comparison tables | `src/pages/Home.tsx` |
-| Slide decks (`/slides/overview`, `/slides/sales`) | `src/pages/Slides.tsx` |
+| Brand name, emails, domain, office location | `src/site.ts` |
+| Page titles, descriptions, sitemap priorities | `src/seo.ts` |
+| FAQs, comparison tables, sender-ID rules, roadmap, proof points | `src/content.ts` |
+| Pages | `src/pages/*.tsx` |
+| Slide decks (`/slides/sales`, `/slides/overview`) | `src/slides/decks.tsx` |
+| Colors, fonts, slide sizing | `src/index.css` (`@theme` tokens) |
+| Logo, favicons, social image | `public/` |
 | Privacy policy / terms | `src/pages/Privacy.tsx`, `src/pages/Terms.tsx` — have counsel review |
-| Performance figures | `src/bench.json` + `PUBLISHED` in `src/benchmark.ts` |
 
-Adding a route? Add it to `src/App.tsx`, `scripts/static-routes.mjs` and
-`public/sitemap.xml`.
+### Brand
 
-### Performance figures
+Midnight navy (`ink-*`) for the network, signal blue (`brand-*`) for the brand, cyan for data in
+motion, amber for the spark in the logo. Display font Space Grotesk, text font Inter — both
+self-hosted, so the site makes no third-party requests.
 
-`src/bench.json` is the output of `crates/loadtest/bench.py` in the product
-repository. The section stays hidden until `PUBLISHED` is `true` — publish only
-numbers a prospect can reproduce in a proof of concept.
+### Slide decks
 
-### Comparison claims
+Written for non-technical buyers. Every size inside a slide is in container-query units, so a
+slide scales as one picture on screen, in full screen (F) and in **Save PDF**, which prints one
+16:9 slide per page. `#5` in the URL opens slide 5.
 
-The competitor tables reflect public vendor documentation (October 2026). Re-check
-them before major campaigns; comparative claims must stay accurate. The sender-ID rules
-table (`senderRules` in `src/pages/Home.tsx`) summarises regulator guidance as of
-September 2026 — re-check it the same way.
+### Claims
 
-Site copy draws on the product docs but must not name internal technologies
-(language, frameworks, databases, queues); describe behaviour, not implementation.
+- Describe what the product does for the business, never how it is built: no languages,
+  frameworks, databases, queues, ports or protocol internals.
+- Performance is stated qualitatively ("thousands of messages per second on a single server").
+  Publish exact figures only when a prospect can reproduce them in a proof of concept
+  (`crates/loadtest/bench.py` in the product repository).
+- Competitor tables reflect public vendor documentation (October 2026); the sender-ID table
+  (`senderRules` in `src/content.ts`) summarizes regulator guidance as of September 2026.
+  Re-check both before major campaigns — comparative claims must stay accurate.
+- The savings calculator is labeled illustrative; keep it that way.

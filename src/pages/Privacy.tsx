@@ -15,8 +15,8 @@ export default function Privacy() {
       <section>
         <h2>2. What we collect</h2>
         <ul>
-          <li><strong>Enquiries.</strong> When you request a demo or email us: your name, business email, company, and — if you choose to give them — phone number, country, organisation type and the details in your message.</li>
-          <li><strong>Technical data.</strong> This website is static and sets no cookies and runs no analytics or advertising trackers. Our hosting provider processes standard request data (such as IP address and browser type) to serve and secure the site.</li>
+          <li><strong>Enquiries.</strong> When you request a demo or email us: your name, business email, company, and — if you choose to give them — phone number, country, organization type, expected message volume, what you are interested in and the details in your message, plus the page you sent the form from.</li>
+          <li><strong>Technical data.</strong> This website is static. It sets no cookies, runs no analytics or advertising trackers, and serves its fonts from our own domain. Our hosting provider processes standard request data (such as IP address and browser type) to serve and secure the site.</li>
         </ul>
       </section>
       <section>
@@ -26,11 +26,11 @@ export default function Privacy() {
           <li>To manage the commercial relationship if you become a customer.</li>
           <li>To meet legal, tax and accounting obligations.</li>
         </ul>
-        <p>Our legal basis is our legitimate interest in responding to business enquiries, or steps you ask us to take before entering a contract. We do not sell personal data and do not use it for automated decision-making.</p>
+        <p>Our legal basis is our legitimate interest in responding to business enquiries, or steps you ask us to take before entering a contract. We do not sell or share personal information for advertising, including as those terms are defined under the California Consumer Privacy Act, and we do not use it for automated decision-making.</p>
       </section>
       <section>
         <h2>4. Who we share it with</h2>
-        <p>Only with service providers that help us operate — our website host, email provider and, where enabled, a form-processing service — under terms that protect your data, or where the law requires it. Some providers may process data outside your country; where they do, we rely on appropriate safeguards such as standard contractual clauses.</p>
+        <p>Only with service providers that help us operate — our website host, our email provider and the form-delivery service that forwards demo requests to our inbox (such as FormSubmit or Web3Forms) — under terms that protect your data, or where the law requires it. Some providers may process data outside your country; where they do, we rely on appropriate safeguards such as standard contractual clauses.</p>
       </section>
       <section>
         <h2>5. Retention</h2>

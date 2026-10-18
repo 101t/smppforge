@@ -6,11 +6,11 @@ export default function Terms() {
     <LegalPage title="Terms of use">
       <section>
         <h2>1. Scope</h2>
-        <p>These terms govern your use of this website ({SITE.url}). Use of the {SITE.name} software itself is governed by the licence agreement or order form you sign with us, or by the end-user licence agreement of the marketplace you buy through; if they conflict with these terms, that agreement prevails.</p>
+        <p>These terms govern your use of this website ({SITE.url}). Use of the {SITE.name} software itself is governed by the license agreement or order form you sign with us, or by the end-user license agreement of the marketplace you buy through; if they conflict with these terms, that agreement prevails.</p>
       </section>
       <section>
         <h2>2. Website content</h2>
-        <p>Content on this site — including product descriptions, performance figures, comparisons and presentations — is provided for general information. Performance figures describe the stated test conditions; results in your environment depend on hardware, network, carriers and configuration. Comparisons with third-party products reflect publicly available information at the time of writing and may not reflect their current versions.</p>
+        <p>Content on this site — including product descriptions, performance statements, savings estimates, comparisons and presentations — is provided for general information. Performance depends on hardware, network, carriers and configuration, and savings estimates are illustrative, not a guarantee. Comparisons with third-party products reflect publicly available information at the time of writing and may not reflect their current versions.</p>
       </section>
       <section>
         <h2>3. Intellectual property</h2>

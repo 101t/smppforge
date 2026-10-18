@@ -1,218 +1,252 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  ArrowRight, CheckCircle2, Send, Building2, Mail, Phone, User, Globe,
-  MessageSquare, Shield, AlertCircle, Sparkles, MapPin,
-} from 'lucide-react';
-import { SiteNav, SiteFooter } from '../components/Chrome';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { CircleCheck, Send, Mail, MapPin, Clock, CircleAlert, Copy, Check, LoaderCircle, ShieldCheck } from 'lucide-react';
+import { Page } from '../components/Layout';
+import { Container, DarkBackdrop, TextLink } from '../components/ui';
+import { EMPTY_LEAD, LeadError, mailtoHref, submitLead, type Lead } from '../lib/leads';
 import { SITE } from '../site';
 
-/** Optional form backend (e.g. Formspree). Without it the form opens the visitor's mail client. */
-const FORM_ENDPOINT = import.meta.env.VITE_FORM_ENDPOINT as string | undefined;
-
 const COUNTRIES = [
-  'Afghanistan', 'Albania', 'Algeria', 'Argentina', 'Australia', 'Austria', 'Bahrain', 'Bangladesh',
-  'Belgium', 'Brazil', 'Canada', 'Chile', 'China', 'Colombia', 'Czech Republic', 'Denmark', 'Egypt',
-  'Ethiopia', 'Finland', 'France', 'Germany', 'Ghana', 'Greece', 'Hungary', 'India', 'Indonesia', 'Iraq',
-  'Ireland', 'Italy', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kuwait', 'Lebanon', 'Libya', 'Malaysia',
-  'Mexico', 'Morocco', 'Netherlands', 'New Zealand', 'Nigeria', 'Norway', 'Oman', 'Pakistan', 'Palestine',
-  'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Saudi Arabia', 'Singapore',
-  'South Africa', 'South Korea', 'Spain', 'Sri Lanka', 'Sweden', 'Switzerland', 'Taiwan', 'Thailand',
-  'Tunisia', 'Turkey', 'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States',
-  'Vietnam', 'Other',
+  'Algeria', 'Argentina', 'Australia', 'Austria', 'Bahrain', 'Bangladesh', 'Belgium', 'Brazil', 'Canada', 'Chile', 'China',
+  'Colombia', 'Czech Republic', 'Denmark', 'Egypt', 'Ethiopia', 'Finland', 'France', 'Germany', 'Ghana', 'Greece', 'Hong Kong',
+  'Hungary', 'India', 'Indonesia', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Japan', 'Jordan', 'Kazakhstan', 'Kenya', 'Kuwait',
+  'Lebanon', 'Libya', 'Malaysia', 'Mexico', 'Morocco', 'Netherlands', 'New Zealand', 'Nigeria', 'Norway', 'Oman', 'Pakistan',
+  'Palestine', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Qatar', 'Romania', 'Saudi Arabia', 'Singapore', 'South Africa',
+  'South Korea', 'Spain', 'Sri Lanka', 'Sweden', 'Switzerland', 'Taiwan', 'Tanzania', 'Thailand', 'Tunisia', 'Türkiye',
+  'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uzbekistan', 'Vietnam', 'Other',
+];
+const ROLES = [
+  'SMS aggregator / wholesale hub', 'Mobile operator / MVNO', 'Enterprise / SaaS platform', 'Bank / fintech', 'Healthcare',
+  'Public sector', 'Reseller / system integrator', 'Other',
+];
+const VOLUMES = ['Under 1M messages / month', '1M – 10M / month', '10M – 50M / month', '50M – 250M / month', 'Over 250M / month', 'Not sure yet'];
+const INTERESTS = ['Platform demo', 'Evaluation plan', 'Business plan', 'Enterprise plan', 'Jasmin migration', 'Migration', 'Partnership', 'Other'];
+
+const NEXT = [
+  { t: 'We reply within one business day', d: 'A solutions engineer — not a bot — reads every request.' },
+  { t: 'Discovery call', d: '30 minutes on your traffic, destinations, carriers and goals.' },
+  { t: 'Tailored demo', d: 'Routing, billing and compliance, configured for your business.' },
+  { t: 'Guided evaluation', d: 'A proof of concept on your own traffic profile, with a deployment plan.' },
 ];
 
-const ROLES = ['Mobile network operator / MVNO', 'SMS aggregator / hub', 'Enterprise messaging platform', 'Reseller / system integrator', 'Other'];
+type Status = 'idle' | 'sending' | 'sent' | 'error';
 
-const benefits = [
-  'Live walkthrough of routing, billing and the operator console',
-  'Your traffic profile: TPS, destinations, carriers and SMPP versions',
-  'Migration plan if you run Jasmin, Kannel or another gateway today',
-  'Deployment options on AWS, private cloud or on-premise',
-];
-
-interface LeadForm {
-  name: string; email: string; company: string; phone: string; country: string; role: string; message: string;
-}
-const EMPTY: LeadForm = { name: '', email: '', company: '', phone: '', country: '', role: '', message: '' };
-
-function mailtoHref(f: LeadForm): string {
-  const body = [
-    `Name: ${f.name}`, `Company: ${f.company}`, `Email: ${f.email}`,
-    f.phone && `Phone: ${f.phone}`, f.country && `Country: ${f.country}`, f.role && `Organisation type: ${f.role}`,
-    '', f.message,
-  ].filter(l => l !== '' && l !== undefined).join('\n');
-  return `mailto:${SITE.salesEmail}?subject=${encodeURIComponent(`Demo request — ${f.company}`)}&body=${encodeURIComponent(body)}`;
+function detailsText(f: Lead) {
+  return [
+    `Name: ${f.name}`, `Email: ${f.email}`, `Company: ${f.company}`, f.phone && `Phone: ${f.phone}`, f.country && `Country: ${f.country}`,
+    f.role && `Organization type: ${f.role}`, f.volume && `Monthly volume: ${f.volume}`, f.interest && `Interested in: ${f.interest}`,
+    f.message && `\n${f.message}`,
+  ].filter(Boolean).join('\n');
 }
 
 export default function Contact() {
-  const [form, setForm] = useState<LeadForm>(EMPTY);
-  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'mailto' | 'error'>('idle');
-  const set = (k: keyof LeadForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-    setForm({ ...form, [k]: e.target.value });
+  const [form, setForm] = useState<Lead>(EMPTY_LEAD);
+  const [status, setStatus] = useState<Status>('idle');
+  const [copied, setCopied] = useState(false);
+  const [honey, setHoney] = useState('');
+  const [params] = useSearchParams();
+  const { pathname, search } = useLocation();
+
+  useEffect(() => {
+    const plan = params.get('plan');
+    const interest = plan ? `${plan} plan` : params.get('interest');
+    if (interest && INTERESTS.includes(interest)) setForm(f => ({ ...f, interest }));
+  }, [params]);
+
+  const set = (k: keyof Lead) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm(f => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!FORM_ENDPOINT) {
-      window.location.href = mailtoHref(form);
-      setState('mailto');
-      return;
-    }
-    setState('sending');
+    if (honey) { setStatus('sent'); return; }
+    setStatus('sending');
     try {
-      const res = await fetch(FORM_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ ...form, _subject: `Demo request — ${form.company}` }),
-      });
-      setState(res.ok ? 'sent' : 'error');
-    } catch {
-      setState('error');
+      await submitLead(form, pathname + search);
+      setStatus('sent');
+    } catch (err) {
+      if (err instanceof LeadError && err.awaitingActivation) console.warn('Demo form: the form provider is waiting for inbox activation —', err.message);
+      setStatus('error');
     }
   };
 
-  const input = 'w-full px-4 py-3 pl-10 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition-all text-sm';
-  const label = 'block text-sm font-medium text-gray-700 mb-1.5';
-  const icon = 'absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400';
-  const ready = form.name && form.email && form.company;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(detailsText(form));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const field = 'block w-full rounded-xl border-0 bg-white px-4 py-3 text-sm text-ink-950 ring-1 ring-ink-200 placeholder:text-ink-400 transition focus:outline-none focus:ring-2 focus:ring-brand-500';
+  const label = 'mb-1.5 block text-sm font-medium text-ink-800';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/40">
-      <title>Request a demo — SMPP Forge</title>
-      <SiteNav />
-      <main className="pt-28 pb-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-2 gap-12 lg:gap-20 items-start">
-        <div className="space-y-8">
-          <div>
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-sm font-semibold mb-6">
-              <Sparkles className="w-4 h-4" /> Talk to an engineer, not a script
-            </div>
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 leading-tight">
-              See SMPP Forge on <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">your traffic</span>
+    <Page>
+      <section className="relative overflow-hidden bg-ink-950 pb-24 pt-32 text-white sm:pt-40">
+        <DarkBackdrop strong />
+        <Container className="relative grid items-start gap-14 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="animate-fade-up">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300 ring-1 ring-white/10">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />Request a demo
+            </span>
+            <h1 className="mt-6 text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+              See {SITE.name} on <span className="text-gradient">your own traffic.</span>
             </h1>
-            <p className="mt-5 text-lg text-gray-600 leading-relaxed max-w-lg">
-              Tell us about your messaging business. We will come back within one business day with a tailored demo and a deployment proposal.
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-200">
+              Tell us about your messaging business. We will come back within {SITE.responseTime} with a tailored demo and a deployment plan.
             </p>
-          </div>
-          <div className="bg-white/70 rounded-2xl border border-gray-100 p-6">
-            <h2 className="text-base font-semibold text-gray-900 mb-4">What we will cover</h2>
-            <ul className="space-y-3">
-              {benefits.map(b => (
-                <li key={b} className="flex items-start gap-3 text-sm text-gray-600">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" /><span>{b}</span>
+
+            <h2 className="mt-12 font-sans text-xs font-semibold uppercase tracking-[0.14em] text-ink-400">What happens next</h2>
+            <ol className="mt-5 space-y-5">
+              {NEXT.map((s, i) => (
+                <li key={s.t} className="flex gap-4">
+                  <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-brand-600/20 font-display text-sm font-bold text-cyan-300 ring-1 ring-brand-400/40">{i + 1}</span>
+                  <div>
+                    <div className="font-semibold text-white">{s.t}</div>
+                    <div className="text-sm text-ink-300">{s.d}</div>
+                  </div>
                 </li>
               ))}
-            </ul>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-4 text-sm">
-            <a href={`mailto:${SITE.salesEmail}`} className="bg-white rounded-xl border border-gray-100 p-4 hover:border-indigo-200">
-              <div className="font-semibold text-gray-900">Sales</div><div className="text-indigo-600">{SITE.salesEmail}</div>
-            </a>
-            <a href={`mailto:${SITE.infoEmail}`} className="bg-white rounded-xl border border-gray-100 p-4 hover:border-indigo-200">
-              <div className="font-semibold text-gray-900">General enquiries</div><div className="text-indigo-600">{SITE.infoEmail}</div>
-            </a>
-          </div>
-          <address className="not-italic flex items-start gap-3 bg-white rounded-xl border border-gray-100 p-4 text-sm">
-            <MapPin className="w-5 h-5 text-indigo-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-semibold text-gray-900">Proudly built in {SITE.country}</div>
-              <div className="text-gray-600">Designed and engineered in {SITE.country} for messaging businesses worldwide.</div>
-            </div>
-          </address>
-          <div className="flex items-center gap-3 text-sm text-gray-500">
-            <Shield className="w-5 h-5 text-gray-400" />
-            <span>No obligation · Guided proof of concept · Reply within one business day</span>
-          </div>
-        </div>
+            </ol>
 
-        <div>
-          {state === 'sent' || state === 'mailto' ? (
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8 sm:p-10 text-center animate-scale-in">
-              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">{state === 'sent' ? 'Request received' : 'Almost there'}</h2>
-              <p className="text-gray-600 leading-relaxed max-w-md mx-auto mb-8">
-                {state === 'sent'
-                  ? <>Thank you, {form.name.split(' ')[0]}. Our team will contact you at <strong className="text-gray-900">{form.email}</strong> within one business day.</>
-                  : <>Your email app should have opened a pre-filled message to <strong className="text-gray-900">{SITE.salesEmail}</strong> — just press send. If nothing opened, email us directly.</>}
-              </p>
-              <div className="flex flex-wrap justify-center gap-3">
-                <Link to="/" className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700">
-                  Back to home <ArrowRight className="w-4 h-4" />
-                </Link>
-                <button onClick={() => { setState('idle'); setForm(EMPTY); }} className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-200">
-                  New request
+            <div className="mt-12 grid gap-3 sm:grid-cols-2">
+              <a href={`mailto:${SITE.salesEmail}`} className="rounded-2xl bg-white/[0.04] p-4 ring-1 ring-white/10 transition hover:bg-white/[0.07]">
+                <Mail className="h-5 w-5 text-cyan-300" aria-hidden />
+                <div className="mt-3 text-sm text-ink-300">Sales</div>
+                <div className="font-semibold text-white">{SITE.salesEmail}</div>
+              </a>
+              <a href={`mailto:${SITE.infoEmail}`} className="rounded-2xl bg-white/[0.04] p-4 ring-1 ring-white/10 transition hover:bg-white/[0.07]">
+                <Mail className="h-5 w-5 text-cyan-300" aria-hidden />
+                <div className="mt-3 text-sm text-ink-300">General & support</div>
+                <div className="font-semibold text-white">{SITE.infoEmail}</div>
+              </a>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-300">
+              <span className="inline-flex items-center gap-2"><MapPin className="h-4 w-4 text-cyan-400" aria-hidden />{SITE.hq.label} · Serving customers worldwide</span>
+              <span className="inline-flex items-center gap-2"><Clock className="h-4 w-4 text-cyan-400" aria-hidden />Reply within {SITE.responseTime}</span>
+            </div>
+          </div>
+
+          <div className="lg:sticky lg:top-24">
+            {status === 'sent' ? (
+              <div className="animate-scale-in rounded-3xl bg-white p-8 text-center text-ink-900 shadow-2xl shadow-black/40 sm:p-12" role="status">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 ring-1 ring-emerald-200">
+                  <CircleCheck className="h-8 w-8 text-emerald-600" aria-hidden />
+                </div>
+                <h2 className="mt-6 text-2xl font-bold">Request received</h2>
+                <p className="mx-auto mt-3 max-w-md text-ink-600">
+                  Thank you{form.name ? `, ${form.name.trim().split(/\s+/)[0]}` : ''}. A solutions engineer will reply
+                  {form.email ? <> to <strong className="text-ink-900">{form.email}</strong></> : null} within {SITE.responseTime}.
+                </p>
+                <div className="mt-8 rounded-2xl bg-ink-50 p-5 text-left ring-1 ring-ink-100">
+                  <div className="text-sm font-semibold text-ink-900">While you wait</div>
+                  <ul className="mt-3 space-y-2">
+                    <li><TextLink to="/slides/sales">Flip through the 5-minute sales deck</TextLink></li>
+                    <li><TextLink to="/compare">See how we compare</TextLink></li>
+                    <li><TextLink to="/platform">Explore the platform</TextLink></li>
+                  </ul>
+                </div>
+                <button type="button" onClick={() => { setStatus('idle'); setForm(EMPTY_LEAD); }} className="mt-6 text-sm font-semibold text-ink-500 hover:text-ink-900">
+                  Send another request
                 </button>
               </div>
-            </div>
-          ) : (
-            <form onSubmit={submit} className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8 sm:p-10">
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">Request a demo</h2>
-              <p className="text-gray-500 text-sm mb-8">Fields marked * are required.</p>
-              {state === 'error' && (
-                <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-sm text-red-700">
-                  <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-                  <p>We could not send your request. Please email <a className="underline" href={mailtoHref(form)}>{SITE.salesEmail}</a> instead.</p>
-                </div>
-              )}
-              <div className="space-y-5">
-                <div>
-                  <label htmlFor="f-name" className={label}>Full name *</label>
-                  <div className="relative"><User className={icon} /><input id="f-name" required autoComplete="name" value={form.name} onChange={set('name')} placeholder="Jane Doe" className={input} /></div>
-                </div>
-                <div>
-                  <label htmlFor="f-email" className={label}>Business email *</label>
-                  <div className="relative"><Mail className={icon} /><input id="f-email" type="email" required autoComplete="email" value={form.email} onChange={set('email')} placeholder="jane@company.com" className={input} /></div>
-                </div>
-                <div>
-                  <label htmlFor="f-company" className={label}>Company *</label>
-                  <div className="relative"><Building2 className={icon} /><input id="f-company" required autoComplete="organization" value={form.company} onChange={set('company')} placeholder="Acme Telecom" className={input} /></div>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4">
+            ) : (
+              <form onSubmit={submit} className="rounded-3xl bg-white p-6 text-ink-900 shadow-2xl shadow-black/40 sm:p-10">
+                <h2 className="text-2xl font-bold">Request a demo</h2>
+                <p className="mt-1 text-sm text-ink-500">Takes under a minute. Fields marked * are required.</p>
+
+                {status === 'error' && (
+                  <div role="alert" className="mt-6 rounded-2xl bg-rose-50 p-4 text-sm text-rose-900 ring-1 ring-rose-200">
+                    <div className="flex gap-3">
+                      <CircleAlert className="h-5 w-5 flex-shrink-0 text-rose-500" aria-hidden />
+                      <div>
+                        <p className="font-semibold">We could not send your request automatically.</p>
+                        <p className="mt-1">Please email us instead — your details are ready to go.</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <a href={mailtoHref(form)} className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 font-semibold text-white hover:bg-rose-500">
+                            <Mail className="h-4 w-4" aria-hidden />Email {SITE.salesEmail}
+                          </a>
+                          <button type="button" onClick={copy} className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 font-semibold text-rose-900 ring-1 ring-rose-200 hover:bg-rose-100">
+                            {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}{copied ? 'Copied' : 'Copy details'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="relative mt-8 grid gap-5 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label htmlFor="f-name" className={label}>Full name *</label>
+                    <input id="f-name" name="name" required autoComplete="name" value={form.name} onChange={set('name')} placeholder="Jane Doe" className={field} />
+                  </div>
+                  <div>
+                    <label htmlFor="f-email" className={label}>Business email *</label>
+                    <input id="f-email" name="email" type="email" required autoComplete="email" value={form.email} onChange={set('email')} placeholder="jane@company.com" className={field} />
+                  </div>
+                  <div>
+                    <label htmlFor="f-company" className={label}>Company *</label>
+                    <input id="f-company" name="company" required autoComplete="organization" value={form.company} onChange={set('company')} placeholder="Acme Telecom" className={field} />
+                  </div>
                   <div>
                     <label htmlFor="f-phone" className={label}>Phone</label>
-                    <div className="relative"><Phone className={icon} /><input id="f-phone" type="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} placeholder="+1 555 000 0000" className={input} /></div>
+                    <input id="f-phone" name="phone" type="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} placeholder="+1 212 555 0100" className={field} />
                   </div>
                   <div>
                     <label htmlFor="f-country" className={label}>Country</label>
-                    <div className="relative"><Globe className={icon} />
-                      <select id="f-country" value={form.country} onChange={set('country')} className={`${input} appearance-none`}>
-                        <option value="">Select country</option>
-                        {COUNTRIES.map(c => <option key={c}>{c}</option>)}
-                      </select>
-                    </div>
+                    <select id="f-country" name="country" autoComplete="country-name" value={form.country} onChange={set('country')} className={field}>
+                      <option value="">Select country</option>
+                      {COUNTRIES.map(c => <option key={c}>{c}</option>)}
+                    </select>
                   </div>
-                </div>
-                <div>
-                  <label htmlFor="f-role" className={label}>Organisation type</label>
-                  <div className="relative"><Building2 className={icon} />
-                    <select id="f-role" value={form.role} onChange={set('role')} className={`${input} appearance-none`}>
+                  <div>
+                    <label htmlFor="f-role" className={label}>Organization type</label>
+                    <select id="f-role" name="role" value={form.role} onChange={set('role')} className={field}>
                       <option value="">Select one</option>
                       {ROLES.map(r => <option key={r}>{r}</option>)}
                     </select>
                   </div>
-                </div>
-                <div>
-                  <label htmlFor="f-message" className={label}>Traffic and requirements</label>
-                  <div className="relative">
-                    <MessageSquare className="absolute left-3.5 top-3.5 w-4 h-4 text-gray-400" />
-                    <textarea id="f-message" rows={4} value={form.message} onChange={set('message')} className={`${input} resize-none`}
-                      placeholder="Monthly volume, peak TPS, destinations, current gateway, deployment preference…" />
+                  <div>
+                    <label htmlFor="f-volume" className={label}>Monthly volume</label>
+                    <select id="f-volume" name="volume" value={form.volume} onChange={set('volume')} className={field}>
+                      <option value="">Select range</option>
+                      {VOLUMES.map(v => <option key={v}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="f-interest" className={label}>I’m interested in</label>
+                    <select id="f-interest" name="interest" value={form.interest} onChange={set('interest')} className={field}>
+                      <option value="">Select one</option>
+                      {INTERESTS.map(v => <option key={v}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label htmlFor="f-message" className={label}>Tell us about your traffic and goals</label>
+                    <textarea id="f-message" name="message" rows={4} value={form.message} onChange={set('message')} className={`${field} resize-y`}
+                      placeholder="Destinations, peak traffic, current gateway or provider, deployment preference…" />
+                  </div>
+                  <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+                    <label htmlFor="f-website">Website</label>
+                    <input id="f-website" name="website" tabIndex={-1} autoComplete="off" value={honey} onChange={e => setHoney(e.target.value)} />
                   </div>
                 </div>
-              </div>
-              <button type="submit" disabled={!ready || state === 'sending'}
-                className={`mt-8 w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-base font-semibold transition-all ${ready && state !== 'sending' ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-600/25' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
-                <Send className="w-5 h-5" /> {state === 'sending' ? 'Sending…' : 'Request a demo'}
-              </button>
-              <p className="mt-4 text-center text-xs text-gray-400 leading-relaxed">
-                We use these details only to respond to your request — see our <Link to="/privacy" className="underline hover:text-gray-600">privacy policy</Link>.
-              </p>
-            </form>
-          )}
-        </div>
-      </main>
-      <SiteFooter />
-    </div>
+
+                <button type="submit" disabled={status === 'sending'}
+                  className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-brand-600/25 transition hover:bg-brand-500 disabled:cursor-wait disabled:opacity-70">
+                  {status === 'sending' ? <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden /> : <Send className="h-5 w-5" aria-hidden />}
+                  {status === 'sending' ? 'Sending…' : 'Request my demo'}
+                </button>
+                <p className="mt-4 flex items-start justify-center gap-2 text-center text-xs leading-relaxed text-ink-500">
+                  <ShieldCheck className="h-4 w-4 flex-shrink-0 text-ink-400" aria-hidden />
+                  <span>We use these details only to respond to your request. No spam, ever — see our <Link to="/privacy" className="underline hover:text-ink-800">privacy policy</Link>.</span>
+                </p>
+              </form>
+            )}
+          </div>
+        </Container>
+      </section>
+    </Page>
   );
 }
